@@ -1,0 +1,11 @@
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+sqlalchemy==2.0.30
+pymysql==1.1.1
+cryptography==42.0.8
+python-jose[cryptography]==3.3.0
+argon2-cffi==23.1.0
+python-multipart==0.0.9
+pandas==3.0.0
+python-dotenv==1.0.1
+slowapi==0.1.9
