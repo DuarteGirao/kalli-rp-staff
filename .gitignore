@@ -1,2 +1,2 @@
 ./backend/.env
-./backend/requirements.txt
+./backend/criar_utilizadores.py
