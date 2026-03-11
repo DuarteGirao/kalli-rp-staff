@@ -1,0 +1,120 @@
+<!-- frontend/pages/gestao.html -->
+<!DOCTYPE html>
+<html lang='pt'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>Gest&atilde;o &mdash; Kalli RP Staff</title>
+    <link rel='stylesheet' href='../css/style.css'>
+</head>
+<body>
+
+<div class='layout'>
+    <aside class='sidebar' id='sidebar'></aside>
+
+    <main class='main-content'>
+        <div class='page-header'>
+            <div class='page-title' id='gestao-titulo'>Gest&atilde;o</div>
+            <div class='page-subtitle'>Membros e avalia&ccedil;&otilde;es</div>
+        </div>
+
+        <div id='membros-grid' class='membros-grid'>
+            <div class='skeleton' style='height:110px;border-radius:10px'></div>
+            <div class='skeleton' style='height:110px;border-radius:10px;opacity:.7'></div>
+            <div class='skeleton' style='height:110px;border-radius:10px;opacity:.4'></div>
+        </div>
+
+        <div id='form-avaliacao' class='card' style='display:none'>
+            <h3 style='margin-bottom:20px;font-size:1rem;font-weight:700'>&#11088; Nova Avalia&ccedil;&atilde;o</h3>
+            <div class='form-group'>
+                <label>Membro a avaliar</label>
+                <select id='sel-membro'><option value=''>Seleciona o membro</option></select>
+            </div>
+            <div class='form-group'>
+                <label>Nota Final (0&ndash;20)</label>
+                <input type='number' id='nota-final' min='0' max='20' step='0.5' placeholder='ex: 16.5'>
+            </div>
+            <div class='form-group'>
+                <label>Coment&aacute;rio <span style='color:var(--text-3)'>(opcional)</span></label>
+                <textarea id='comentario' placeholder='Escreve o coment&aacute;rio\u2026'></textarea>
+            </div>
+            <button class='btn btn-primary' onclick='submeterAvaliacao()'>Enviar Avalia&ccedil;&atilde;o</button>
+        </div>
+    </main>
+</div>
+
+<script src='../js/api.js'></script>
+<script src='../js/sidebar.js'></script>
+<script>
+    initSidebar('gestao');
+
+    const _user    = JSON.parse(localStorage.getItem('user') || '{}');
+    const gestaoId = new URLSearchParams(window.location.search).get('id') || 1;
+    const isChefe  = _user.role === 'chefe' || _user.role === 'admin';
+    const GESTOES  = { 1: 'Orgs', 2: 'Handlings', 3: 'Dev', 4: 'POVs', 5: 'Conte\u00fados', 6: 'Staff' };
+
+    document.getElementById('gestao-titulo').textContent = 'Gest\u00e3o de ' + (GESTOES[gestaoId] || 'Equipa');
+
+    async function carregarMembros() {
+        const grid = document.getElementById('membros-grid');
+        try {
+            const membros = await apiFetch('/gestoes/' + gestaoId + '/membros');
+            const sel = document.getElementById('sel-membro');
+            sel.innerHTML = '<option value="">Seleciona o membro</option>';
+
+            if (!membros.length) {
+                grid.innerHTML = "<div class='empty-state' style='grid-column:1/-1'><div class='empty-icon'>\uD83D\uDC65</div><p>Sem membros nesta gest\u00e3o.</p></div>";
+                return;
+            }
+
+            grid.innerHTML = membros.map(m => {
+                const initial = m.username[0].toUpperCase();
+                return "<div class='membro-card'>" +
+                    "<div style='display:flex;align-items:center;gap:10px;margin-bottom:10px'>" +
+                    "<div class='sidebar-avatar' style='width:34px;height:34px;font-size:.8rem'>" + initial + "</div>" +
+                    "<div><div class='membro-name'>" + m.username + "</div><div class='membro-nivel'>N\u00edvel " + m.nivel + "</div></div></div>" +
+                    (m.is_chefe ? "<span class='badge badge-purple'>Chefe</span>" : "<span class='badge badge-blue'>Membro</span>") +
+                    (isChefe ? "<div class='membro-actions'><button class='btn btn-danger btn-sm' onclick='removerMembro(" + m.id + ")'>Remover</button></div>" : '') +
+                    "</div>";
+            }).join('');
+
+            membros.forEach(m => { sel.innerHTML += '<option value="' + m.id + '">' + m.username + '</option>'; });
+            if (isChefe) document.getElementById('form-avaliacao').style.display = 'block';
+        } catch (e) {
+            grid.innerHTML = "<div class='error-box'>Erro ao carregar membros: " + e.message + '</div>';
+        }
+    }
+
+    async function removerMembro(userId) {
+        if (!confirm('Tens a certeza que queres remover este membro?')) return;
+        try {
+            await apiFetch('/gestoes/' + gestaoId + '/membros/' + userId, { method: 'DELETE' });
+            showToast('Membro removido com sucesso.', 'success');
+            carregarMembros();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function submeterAvaliacao() {
+        const body = {
+            avaliado_id: parseInt(document.getElementById('sel-membro').value),
+            gestao_id:   parseInt(gestaoId),
+            nota_final:  parseFloat(document.getElementById('nota-final').value),
+            comentario:  document.getElementById('comentario').value || null
+        };
+        if (!body.avaliado_id) { showToast('Seleciona um membro.', 'error'); return; }
+        if (isNaN(body.nota_final) || body.nota_final < 0 || body.nota_final > 20) {
+            showToast('Insere uma nota v\u00e1lida (0\u201320).', 'error'); return;
+        }
+        try {
+            await apiFetch('/avaliacoes/', { method: 'POST', body: JSON.stringify(body) });
+            showToast('Avalia\u00e7\u00e3o enviada com sucesso!', 'success');
+            document.getElementById('nota-final').value = '';
+            document.getElementById('comentario').value = '';
+            document.getElementById('sel-membro').value = '';
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    carregarMembros();
+</script>
+</body>
+</html>

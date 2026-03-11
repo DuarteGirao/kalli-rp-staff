@@ -1,0 +1,9 @@
+{
+  "include": ["backend"],
+  "extraPaths": ["backend"],
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "reportUnknownMemberType": "none",
+  "reportUnknownVariableType": "none",
+  "reportUnknownArgumentType": "none"
+}

@@ -1,0 +1,137 @@
+<!-- frontend/pages/hierarquia.html -->
+<!-- Tabela com todos os staff e botões para subir/descer -->
+ 
+<div class='hierarquia-panel'>
+    <h2>Gestão de Hierarquia</h2>
+    <!DOCTYPE html>
+    <html lang='pt'>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+        <title>Hierarquia &mdash; Kalli RP Staff</title>
+        <link rel='stylesheet' href='../css/style.css'>
+    </head>
+    <body>
+
+    <div class='layout'>
+        <aside class='sidebar' id='sidebar'></aside>
+
+        <main class='main-content'>
+            <div class='page-header'>
+                <div class='page-title'>Hierarquia</div>
+                <div class='page-subtitle'>Gest&atilde;o de n&iacute;veis e posi&ccedil;&otilde;es</div>
+            </div>
+
+            <div class='card'>
+                <div class='table-wrap'>
+                    <table id='tabela-staff'>
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>N&iacute;vel</th>
+                                <th>A&ccedil;&otilde;es</th>
+                            </tr>
+                        </thead>
+                        <tbody id='tbody-staff'>
+                            <tr><td colspan='4' style='text-align:center;padding:24px;color:var(--text-3)'>A carregar&hellip;</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal alterar nível -->
+    <div class='popup-overlay' id='modal-nivel' style='display:none'>
+        <div class='modal'>
+            <div class='modal-header'>
+                <h3 class='modal-title'>&#128203; Alterar N&iacute;vel</h3>
+                <button class='modal-close' onclick='fecharModal()' aria-label='Fechar'>&times;</button>
+            </div>
+            <div class='modal-body'>
+                <p id='modal-desc' style='color:var(--text-2);margin-bottom:16px'></p>
+                <div class='form-group'>
+                    <label>Justifica&ccedil;&atilde;o <span style='color:var(--text-3)'>(m&iacute;n. 10 caracteres)</span></label>
+                    <textarea id='justificacao' placeholder='Explica o motivo da altera&ccedil;&atilde;o\u2026'></textarea>
+                </div>
+            </div>
+            <div class='modal-actions'>
+                <button class='btn btn-ghost' onclick='fecharModal()'>Cancelar</button>
+                <button class='btn btn-primary' onclick='confirmarAlteracao()'>Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src='../js/api.js'></script>
+    <script src='../js/sidebar.js'></script>
+    <script>
+        initSidebar('hierarquia');
+
+        let _pendingChange = null;
+        const authUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const canEdit  = authUser.role === 'admin' || authUser.role === 'chefe';
+
+        const ROLE_BADGE = {
+            admin:  '<span class="badge badge-red">Admin</span>',
+            chefe:  '<span class="badge badge-purple">Chefe</span>',
+            staff:  '<span class="badge badge-blue">Staff</span>'
+        };
+
+        async function carregarStaff() {
+            const tbody = document.getElementById('tbody-staff');
+            try {
+                const staff = await apiFetch('/hierarquia/');
+                if (!staff.length) {
+                    tbody.innerHTML = "<tr><td colspan='4' style='text-align:center;padding:24px;color:var(--text-3)'>Nenhum membro encontrado.</td></tr>";
+                    return;
+                }
+                tbody.innerHTML = staff.map(u => {
+                    const badge = ROLE_BADGE[u.role] || '<span class="badge">' + u.role + '</span>';
+                    const actions = canEdit
+                        ? '<button class="btn btn-ghost btn-sm" onclick="pedirAlteracao(' + u.id + ',' + u.nivel + ',1)">\u25b2 Subir</button>' +
+                          '<button class="btn btn-ghost btn-sm" onclick="pedirAlteracao(' + u.id + ',' + u.nivel + ',-1)"' + (u.nivel <= 1 ? ' disabled' : '') + '>\u25bc Descer</button>'
+                        : '<span style="color:var(--text-3);font-size:.8rem">Sem permiss\u00e3o</span>';
+                    return '<tr><td>' + u.username + '</td><td>' + badge + '</td><td>' +
+                           '<span class="badge">' + u.nivel + '</span></td><td>' +
+                           '<div style="display:flex;gap:6px;flex-wrap:wrap">' + actions + '</div></td></tr>';
+                }).join('');
+            } catch (e) {
+                tbody.innerHTML = "<tr><td colspan='4'><div class='error-box'>" + e.message + '</div></td></tr>';
+            }
+        }
+
+        function pedirAlteracao(userId, nivelAtual, delta) {
+            _pendingChange = { userId, nivelAtual, delta };
+            document.getElementById('modal-desc').textContent = 'N\u00edvel ' + nivelAtual + ' \u2192 ' + (nivelAtual + delta);
+            document.getElementById('justificacao').value = '';
+            document.getElementById('modal-nivel').style.display = 'flex';
+        }
+
+        function fecharModal() {
+            document.getElementById('modal-nivel').style.display = 'none';
+            _pendingChange = null;
+        }
+
+        async function confirmarAlteracao() {
+            if (!_pendingChange) return;
+            const just = document.getElementById('justificacao').value.trim();
+            if (just.length < 10) { showToast('Justifica\u00e7\u00e3o muito curta (m\u00edn. 10 caracteres).', 'error'); return; }
+            const body = {
+                user_id:      _pendingChange.userId,
+                novo_nivel:   _pendingChange.nivelAtual + _pendingChange.delta,
+                justificacao: just
+            };
+            try {
+                await apiFetch('/hierarquia/nivel', { method: 'PATCH', body: JSON.stringify(body) });
+                fecharModal();
+                showToast('N\u00edvel alterado com sucesso.', 'success');
+                carregarStaff();
+            } catch (e) { showToast(e.message, 'error'); }
+        }
+
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharModal(); });
+        carregarStaff();
+    </script>
+    </body>
+    </html>

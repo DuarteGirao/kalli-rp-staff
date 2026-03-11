@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang='pt'>
+<head>
+	<meta charset='UTF-8'>
+	<meta name='viewport' content='width=device-width, initial-scale=1.0'>
+	<title>Inbox &mdash; Kalli RP Staff</title>
+	<link rel='stylesheet' href='../css/style.css'>
+</head>
+<body>
+
+<div class='layout'>
+	<aside class='sidebar' id='sidebar'></aside>
+
+	<main class='main-content'>
+		<div class='page-header' style='display:flex;align-items:flex-start;justify-content:space-between;gap:16px'>
+			<div>
+				<div class='page-title'>Inbox</div>
+				<div class='page-subtitle'>As tuas notifica&ccedil;&otilde;es e mensagens</div>
+			</div>
+			<button class='btn btn-secondary btn-sm' id='btn-mark-all' style='margin-top:4px'>
+				&#10003; Marcar todas como lidas
+			</button>
+		</div>
+
+		<div id='inbox-list' class='inbox-list'>
+			<div class='skeleton' style='height:70px;border-radius:10px'></div>
+			<div class='skeleton' style='height:70px;border-radius:10px;opacity:.7'></div>
+			<div class='skeleton' style='height:70px;border-radius:10px;opacity:.4'></div>
+		</div>
+	</main>
+</div>
+
+<!-- Modal mensagem expandida -->
+<div id='modal-msg' class='modal' style='display:none'>
+	<div class='modal-box' style='max-width:520px'>
+		<div style='display:flex;align-items:center;gap:12px;margin-bottom:18px'>
+			<div class='inbox-icon' id='modal-icon' style='width:44px;height:44px;border-radius:10px;font-size:1.3rem;flex-shrink:0;display:flex;align-items:center;justify-content:center'></div>
+			<div>
+				<h3 id='modal-titulo' style='font-size:1rem;margin-bottom:0'></h3>
+				<small id='modal-data' style='color:var(--text-3);font-size:.72rem'></small>
+			</div>
+		</div>
+		<div id='modal-conteudo' style='font-size:.875rem;color:var(--text-2);line-height:1.7;white-space:pre-wrap;background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:14px 16px'></div>
+		<div class='modal-actions'>
+			<button class='btn btn-primary' onclick='fecharModal()'>Fechar</button>
+		</div>
+	</div>
+</div>
+
+<script src='../js/api.js'></script>
+<script src='../js/sidebar.js'></script>
+<script>
+	initSidebar('inbox');
+
+	const ICONS  = { avaliacao: '\u2B50', hierarquia: '\uD83D\uDCC8', sistema: '\u2139\uFE0F' };
+	const COLORS = { avaliacao: 'rgba(124,58,237,.15)', hierarquia: 'rgba(245,158,11,.15)', sistema: 'rgba(59,130,246,.15)' };
+	let _msgs = [];
+
+	function fmtDate(iso) {
+		if (!iso) return '';
+		return new Date(iso).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+	}
+
+	async function loadInbox() {
+		const container = document.getElementById('inbox-list');
+		try {
+			_msgs = await Inbox.get();
+			if (!_msgs.length) {
+				container.innerHTML = "<div class='empty-state'><div class='empty-icon'>\u2709\uFE0F</div><p>N\u00e3o tens mensagens.</p></div>";
+				return;
+			}
+			container.innerHTML = _msgs.map(m => `
+				<div class='inbox-item${m.lida ? '' : ' unread'}' data-id='${m.id}' onclick='abrirMsg(${m.id})'>
+					<div class='inbox-icon ${m.tipo}' style='background:${COLORS[m.tipo] || COLORS.sistema}'>
+						${ICONS[m.tipo] || '\uD83D\uDCE9'}
+					</div>
+					<div class='inbox-body'>
+						<div class='inbox-title'>${m.titulo}</div>
+						<div class='inbox-preview'>${m.conteudo}</div>
+					</div>
+					<div class='inbox-meta'>
+						<span class='inbox-date'>${fmtDate(m.data)}</span>
+						${!m.lida ? "<span class='unread-dot'></span>" : ''}
+					</div>
+				</div>`).join('');
+		} catch (e) {
+			container.innerHTML = "<div class='error-box'>Erro ao carregar inbox: " + e.message + '</div>';
+		}
+	}
+
+	async function abrirMsg(id) {
+		const m = _msgs.find(x => x.id === id);
+		if (!m) return;
+		document.getElementById('modal-icon').textContent = ICONS[m.tipo] || '\uD83D\uDCE9';
+		document.getElementById('modal-icon').style.background = COLORS[m.tipo] || COLORS.sistema;
+		document.getElementById('modal-titulo').textContent = m.titulo;
+		document.getElementById('modal-conteudo').textContent = m.conteudo;
+		document.getElementById('modal-data').textContent = fmtDate(m.data);
+		document.getElementById('modal-msg').style.display = 'flex';
+		if (!m.lida) {
+			await Inbox.marcarLida(id);
+			m.lida = true;
+			const el = document.querySelector('.inbox-item[data-id="' + id + '"]');
+			if (el) { el.classList.remove('unread'); el.querySelector('.unread-dot')?.remove(); }
+			loadInboxBadge();
+		}
+	}
+
+	function fecharModal() {
+		document.getElementById('modal-msg').style.display = 'none';
+	}
+
+	document.getElementById('btn-mark-all').addEventListener('click', async () => {
+		const unread = _msgs.filter(m => !m.lida);
+		if (!unread.length) { showToast('Nenhuma mensagem por ler.', 'info'); return; }
+		await Promise.all(unread.map(m => Inbox.marcarLida(m.id)));
+		showToast(unread.length + ' mensagem(ns) marcada(s) como lida(s).', 'success');
+		loadInbox();
+		loadInboxBadge();
+	});
+
+	document.addEventListener('keydown', e => { if (e.key === 'Escape') fecharModal(); });
+	loadInbox();
+</script>
+</body>
+</html>

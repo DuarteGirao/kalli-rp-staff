@@ -1,0 +1,94 @@
+<!-- frontend/pages/dashboard.html -->
+<!DOCTYPE html>
+<html lang='pt'>
+<head>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>Dashboard &mdash; Kalli RP Staff</title>
+    <link rel='stylesheet' href='../css/style.css'>
+    <script src='https://cdn.jsdelivr.net/npm/chart.js'></script>
+</head>
+<body>
+
+<!-- Pop-up inbox -->
+<div id='popup-inbox' class='popup-overlay' style='display:none'>
+    <div class='popup-box'>
+        <div class='popup-emoji'>&#128236;</div>
+        <h3>Tens mensagens novas!</h3>
+        <p id='popup-count'></p>
+        <div class='popup-actions'>
+            <a href='inbox.html' class='btn btn-primary'>Ver Inbox</a>
+            <button class='btn btn-secondary' onclick="document.getElementById('popup-inbox').style.display='none'">Fechar</button>
+        </div>
+    </div>
+</div>
+
+<div class='layout'>
+    <aside class='sidebar' id='sidebar'></aside>
+
+    <main class='main-content'>
+        <div class='page-header'>
+            <div class='page-title'>Dashboard</div>
+            <div class='page-subtitle' id='greeting'>&nbsp;</div>
+        </div>
+
+        <div class='stats-row'>
+            <div class='stat-card'>
+                <div class='stat-icon'>&#128202;</div>
+                <span id='stat-reports'>&mdash;</span>
+                <small>Reports este m&ecirc;s</small>
+            </div>
+            <div class='stat-card'>
+                <div class='stat-icon'>&#127915;</div>
+                <span id='stat-tickets'>&mdash;</span>
+                <small>Tickets este m&ecirc;s</small>
+            </div>
+            <div class='stat-card'>
+                <div class='stat-icon'>&#128200;</div>
+                <span id='stat-nivel'>&mdash;</span>
+                <small>N&iacute;vel hier&aacute;rquico</small>
+            </div>
+        </div>
+
+        <div class='chart-container'>
+            <div class='chart-header'>
+                <div>
+                    <h2>Atividade</h2>
+                    <small>Reports e Tickets do per&iacute;odo</small>
+                </div>
+                <div class='chart-toggle'>
+                    <button id='btn-donut' class='active' onclick='toggleChart("donut")'>Circular</button>
+                    <button id='btn-line' onclick='toggleChart("line")'>Linha</button>
+                </div>
+            </div>
+            <canvas id='myChart' style='max-height:300px'></canvas>
+        </div>
+    </main>
+</div>
+
+<script src='../js/api.js'></script>
+<script src='../js/sidebar.js'></script>
+<script src='../js/charts.js'></script>
+<script>
+    initSidebar('dashboard');
+
+    const _u = JSON.parse(localStorage.getItem('user') || '{}');
+    const _h = new Date().getHours();
+    const _g = _h < 12 ? 'Bom dia' : _h < 19 ? 'Boa tarde' : 'Boa noite';
+    document.getElementById('greeting').textContent = _g + ', ' + (_u.username || 'staff') + ' \uD83D\uDC4B';
+    document.getElementById('stat-nivel').textContent = _u.nivel ?? '\u2014';
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const data = await Inbox.countNaoLidas();
+            if (data.count > 0) {
+                document.getElementById('popup-count').textContent =
+                    'Tens ' + data.count + ' mensagem(ns) n\u00e3o lida(s).';
+                document.getElementById('popup-inbox').style.display = 'flex';
+            }
+        } catch (_) {}
+        await loadDashboard();
+    });
+</script>
+</body>
+</html>
